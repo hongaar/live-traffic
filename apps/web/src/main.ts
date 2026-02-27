@@ -197,7 +197,20 @@ async function updateFilters() {
     console.log('Setting filters:', filters);
     const result = await wsClient.setFilters(filters);
 
-    console.log(`Received ${(result as any).events?.length || 0} historical events`);
+    // Add historical events to state and render them
+    const historicalEvents = (result as any).events || [];
+    console.log(`Received ${historicalEvents.length} historical events`);
+    
+    for (const event of historicalEvents) {
+      state.events.set(event.id, event);
+    }
+    
+    // Update map layers with all events
+    if (historicalEvents.length > 0) {
+      updateMapLayers(Array.from(state.events.values()));
+      updateEventCount();
+    }
+    
     state.subscribed = true;
     updateConnectionStatus();
   } catch (err) {
