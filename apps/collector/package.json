@@ -12,7 +12,8 @@
   "dependencies": {
     "@live-traffic/db": "workspace:*",
     "@live-traffic/types": "workspace:*",
-    "@live-traffic/adapter-ndw": "workspace:*"
+    "@live-traffic/adapter-ndw": "workspace:*",
+    "@live-traffic/logger": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",

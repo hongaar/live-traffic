@@ -2,13 +2,20 @@ import { initDb, closeDb } from '@live-traffic/db';
 import { NDWAdapter } from '@live-traffic/adapter-ndw';
 import { AdapterRunner } from './runner';
 import { defaultAdapterConfig } from './types';
+import { getLogger, setLogLevel } from '@live-traffic/logger';
+
+const logger = getLogger('Collector');
 
 async function main() {
-  console.log('🚀 Live Traffic Collector starting...');
+  // Set log level from environment variable (default: info)
+  const logLevel = (process.env.LOG_LEVEL || 'info') as any;
+  setLogLevel(logLevel);
+
+  logger.info('Live Traffic Collector starting...');
 
   try {
     // Initialize database
-    console.log('📦 Initializing database...');
+    logger.info('Initializing database...');
     await initDb();
 
     // Create and configure runner
@@ -22,7 +29,7 @@ async function main() {
 
     // Handle graceful shutdown
     const shutdown = async () => {
-      console.log('\n📴 Shutting down...');
+      logger.info('Shutting down...');
       await runner.stop();
       closeDb();
       process.exit(0);
@@ -31,9 +38,9 @@ async function main() {
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
 
-    console.log('✅ Collector running');
+    logger.info('Collector running');
   } catch (err) {
-    console.error('❌ Fatal error:', err);
+    logger.error('Fatal error', err);
     process.exit(1);
   }
 }

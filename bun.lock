@@ -36,6 +36,7 @@
       "dependencies": {
         "@live-traffic/adapter-ndw": "workspace:*",
         "@live-traffic/db": "workspace:*",
+        "@live-traffic/logger": "workspace:*",
         "@live-traffic/types": "workspace:*",
       },
       "devDependencies": {
@@ -62,6 +63,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@live-traffic/db": "workspace:*",
+        "@live-traffic/logger": "workspace:*",
         "@live-traffic/types": "workspace:*",
         "fast-xml-parser": "^4.3.5",
       },
@@ -83,6 +85,14 @@
       },
       "optionalDependencies": {
         "pg": "^8.11.3",
+      },
+    },
+    "packages/logger": {
+      "name": "@live-traffic/logger",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/node": "^20.10.6",
+        "typescript": "^5.3.3",
       },
     },
     "packages/types": {
@@ -151,6 +161,8 @@
     "@live-traffic/collector": ["@live-traffic/collector@workspace:apps/collector"],
 
     "@live-traffic/db": ["@live-traffic/db@workspace:packages/db"],
+
+    "@live-traffic/logger": ["@live-traffic/logger@workspace:packages/logger"],
 
     "@live-traffic/types": ["@live-traffic/types@workspace:packages/types"],
 

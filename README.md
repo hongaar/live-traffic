@@ -248,6 +248,63 @@ cd apps/web
 bun run dev
 ```
 
+### Logging
+
+The collector supports configurable logging levels via the `LOG_LEVEL` environment variable. Different levels provide varying amounts of detail about adapter operations and API requests/responses.
+
+**Log Levels:**
+
+| Level | Description | Use Case |
+|-------|-------------|----------|
+| `error` | Only errors | Production (minimal) |
+| `warn` | Errors and warnings | Production (default) |
+| `info` | General operational info | Typical deployments |
+| `debug` | Detailed debug information | Development & troubleshooting |
+| `verbose` | Full request/response details | Debugging adapter issues |
+
+**Setting the Log Level:**
+
+```bash
+# Default (info level)
+cd apps/collector
+bun src/index.ts
+
+# Enable verbose logging for debugging
+LOG_LEVEL=verbose bun src/index.ts
+
+# Or debug level for less detail
+LOG_LEVEL=debug bun src/index.ts
+```
+
+**Example Output with `LOG_LEVEL=verbose`:**
+
+```
+2026-02-27T10:15:23.456Z INFO    [Collector] Live Traffic Collector starting...
+2026-02-27T10:15:23.501Z INFO    [Collector] Initializing database...
+2026-02-27T10:15:23.612Z INFO    [Runner] Starting adapters...
+2026-02-27T10:15:23.801Z INFO    [NDW] Starting adapter
+2026-02-27T10:15:23.850Z VERBOSE [NDW] GET https://opendata.ndw.nu/incidents {
+  "decompressedSize": 125000,
+  "xmlSize": 512000
+}
+2026-02-27T10:15:24.150Z VERBOSE [NDW] GET https://opendata.ndw.nu/incidents 200 (300ms) { ... response details ... }
+2026-02-27T10:15:24.200Z INFO    [NDW] Inserted/updated 42 incidents
+```
+
+In **debug** level, the detailed data is omitted for cleaner output:
+
+```
+2026-02-27T10:15:24.200Z DEBUG   [NDW] GET https://opendata.ndw.nu/incidents 200 (300ms)
+```
+
+**Verbose Mode Highlights:**
+
+- Full request/response bodies for adapter feeds
+- Decompressed data sizes
+- Response timing in milliseconds
+- Error stack traces
+- Configuration details during startup
+
 ## API Usage
 
 ### REST

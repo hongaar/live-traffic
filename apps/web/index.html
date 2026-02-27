@@ -27,9 +27,8 @@
       }
 
       .header {
-        background: #fff;
+        position: absolute;
         padding: 16px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         z-index: 10;
       }
 
@@ -37,20 +36,6 @@
         font-size: 20px;
         font-weight: 600;
       }
-
-      .controls {
-        display: flex;
-        gap: 12px;
-        margin-top: 12px;
-        flex-wrap: wrap;
-      }
-
-      .control-group {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
       label {
         font-size: 14px;
         font-weight: 500;
@@ -103,7 +88,7 @@
       .sidebar {
         position: absolute;
         right: 16px;
-        top: 80px;
+        top: 16px;
         background: white;
         padding: 16px;
         border-radius: 8px;
@@ -178,22 +163,6 @@
     <div id="app">
       <div class="header">
         <h1>🚗 Live Traffic Data</h1>
-        <div class="controls">
-          <div class="control-group">
-            <label for="type-filter">Event Type:</label>
-            <select id="type-filter">
-              <option value="">All Types</option>
-              <option value="incident">Incidents</option>
-              <option value="speed">Speed</option>
-              <option value="travel_time">Travel Time</option>
-              <option value="road_work">Road Work</option>
-              <option value="message_sign">Messages/Signs</option>
-            </select>
-          </div>
-          <button id="load-btn">Load Data</button>
-          <button id="subscribe-btn" class="secondary">Subscribe</button>
-          <button id="unsubscribe-btn" class="secondary" style="display: none;">Unsubscribe</button>
-        </div>
       </div>
 
       <div id="map"></div>

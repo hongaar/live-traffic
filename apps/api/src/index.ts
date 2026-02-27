@@ -4,11 +4,12 @@ import { initDb, queryEvents, closeDb } from '@live-traffic/db';
 import {
   EventQueryParamsSchema,
   WSClientMessageSchema,
-  type WSQueryMessage,
-  type WSSubscribeMessage,
+  type WSClientSetFiltersMessage,
+  type EventQueryParams,
 } from '@live-traffic/types';
 
 const app = new Hono();
+const wsConnections = new Map<any, EventQueryParams | null>();
 
 // Middleware
 app.use(
@@ -45,64 +46,6 @@ app.get('/api/events', async (c) => {
   }
 });
 
-// WebSocket: /ws
-app.get('/ws', (c: any) => {
-  return c.upgrade((ws: any) => {
-    const subscriptions = new Map<string, { type?: string; bbox?: string }>();
-
-    ws.on('message', async (message: string) => {
-      try {
-        const data = JSON.parse(message);
-        const parsed = WSClientMessageSchema.parse(data);
-
-        if (parsed.method === 'query') {
-          const queryMsg = parsed as WSQueryMessage;
-          const result = await queryEvents(queryMsg.params);
-
-          ws.send(
-            JSON.stringify({
-              method: 'query_response',
-              data: result,
-            })
-          );
-        } else if (parsed.method === 'subscribe') {
-          const subMsg = parsed as WSSubscribeMessage;
-          const subId = crypto.randomUUID();
-          subscriptions.set(subId, {
-            type: subMsg.params.type,
-            bbox: subMsg.params.bbox,
-          });
-
-          console.log(`[WS] Client subscribed with id ${subId}`, subMsg.params);
-
-          ws.send(
-            JSON.stringify({
-              method: 'subscribed',
-              subscriptionId: subId,
-            })
-          );
-        } else if (parsed.method === 'unsubscribe') {
-          subscriptions.clear();
-          console.log('[WS] Client unsubscribed');
-        }
-      } catch (err) {
-        console.error('[WS] Error processing message:', err);
-        ws.send(
-          JSON.stringify({
-            method: 'error',
-            message: 'Invalid message format',
-          })
-        );
-      }
-    });
-
-    ws.on('close', () => {
-      subscriptions.clear();
-      console.log('[WS] Client disconnected');
-    });
-  });
-});
-
 // Start server
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
@@ -116,12 +59,80 @@ async function start() {
 
     const server = Bun.serve({
       port: PORT,
-      fetch: app.fetch,
+      fetch: (req, server) => {
+        // Check if this is a WebSocket upgrade request to /ws
+        if (req.url.includes('/ws') && req.headers.get('upgrade') === 'websocket') {
+          const success = server.upgrade(req);
+          if (success) return undefined;
+          return new Response('WebSocket upgrade failed', { status: 400 });
+        }
+
+        // Route all other requests through Hono
+        return app.fetch(req);
+      },
+      websocket: {
+        open: (ws: any) => {
+          console.log('[WS] Client connected');
+          wsConnections.set(ws, null);
+        },
+
+        message: async (ws: any, message: any) => {
+          try {
+            const data = JSON.parse(message.toString());
+            const parsed = WSClientMessageSchema.parse(data);
+
+            if (parsed.method === 'set_filters') {
+              const filterMsg = parsed as WSClientSetFiltersMessage;
+              const filters = filterMsg.filters;
+              wsConnections.set(ws, filters);
+
+              console.log(`[WS] Client set filters:`, filters);
+
+              // Fetch and send historical events
+              try {
+                const result = await queryEvents(filters);
+
+                ws.send(
+                  JSON.stringify({
+                    type: 'historical_events',
+                    inResponseTo: filterMsg.id,
+                    events: result.events,
+                    total: result.total,
+                    limit: result.limit,
+                  })
+                );
+              } catch (queryErr) {
+                console.error('[WS] Error querying events:', queryErr);
+                ws.send(
+                  JSON.stringify({
+                    type: 'error',
+                    inResponseTo: filterMsg.id,
+                    message: 'Failed to query events',
+                  })
+                );
+              }
+            }
+          } catch (err) {
+            console.error('[WS] Error processing message:', err);
+            ws.send(
+              JSON.stringify({
+                type: 'error',
+                message: 'Invalid message format',
+              })
+            );
+          }
+        },
+
+        close: (ws: any) => {
+          wsConnections.delete(ws);
+          console.log('[WS] Client disconnected');
+        },
+      },
     });
 
     console.log(`✅ API listening on http://localhost:${PORT}`);
     console.log(`   REST: GET /api/events`);
-    console.log(`   WebSocket: /ws`);
+    console.log(`   WebSocket: /ws (set_filters method)`);
 
     // Handle graceful shutdown
     const shutdown = async () => {

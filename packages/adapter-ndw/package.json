@@ -11,6 +11,7 @@
   "dependencies": {
     "@live-traffic/types": "workspace:*",
     "@live-traffic/db": "workspace:*",
+    "@live-traffic/logger": "workspace:*",
     "fast-xml-parser": "^4.3.5"
   },
   "devDependencies": {

@@ -1,10 +1,9 @@
 import maplibregl from 'maplibre-gl';
 import { WSClient } from './ws-client';
-import type { AnyEvent, EventListResponse } from '@live-traffic/types';
+import type { AnyEvent, EventQueryParams } from '@live-traffic/types';
 import type { MapState } from './types';
 
-const API_BASE = process.env.VITE_API_BASE || 'http://localhost:3000';
-const WS_URL = process.env.VITE_WS_URL || 'ws://localhost:3000/ws';
+const WS_URL = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`;
 
 let state: MapState = {
   events: new Map(),
@@ -38,7 +37,7 @@ function getColorForType(type: string): string {
 async function initMap() {
   map = new maplibregl.Map({
     container: 'map',
-    style: 'https://demotiles.maplibre.org/style.json',
+    style: 'https://tiles.openfreemap.org/styles/liberty',
     center: [5.2913, 52.1326], // Center of Netherlands
     zoom: 7,
   });
@@ -162,25 +161,47 @@ function updateMapLayers(events: AnyEvent[]) {
   }
 }
 
-async function loadEvents() {
+/**
+ * Build filter object based on checked layers
+ */
+function getEnabledTypesFilter(): string | undefined {
+  const enabledTypes = Object.entries(state.layerVisibility)
+    .filter(([_, visible]) => visible)
+    .map(([type, _]) => type);
+
+  if (enabledTypes.length === 0) {
+    return undefined;
+  }
+
+  // For now, return the first enabled type if only one, or undefined to get all
+  // In a real app, you might want to support multiple types
+  return enabledTypes.length === 5 ? undefined : enabledTypes[0];
+}
+
+/**
+ * Set filters based on current layer visibility
+ */
+async function updateFilters() {
+  if (!wsClient.isConnected()) {
+    console.log('WebSocket not connected, skipping filter update');
+    return;
+  }
+
   try {
-    const typeParam = state.selectedEventType ? `&type=${state.selectedEventType}` : '';
-    const response = await fetch(`${API_BASE}/api/events?limit=200${typeParam}`);
-    const data = (await response.json()) as EventListResponse;
+    const filters: EventQueryParams = {
+      type: getEnabledTypesFilter(),
+      limit: 200,
+      since: Date.now() - 3600000, // Last hour
+    };
 
-    // Store events
-    for (const event of data.events) {
-      state.events.set(event.id, event);
-    }
+    console.log('Setting filters:', filters);
+    const result = await wsClient.setFilters(filters);
 
-    // Update map
-    updateMapLayers(Array.from(state.events.values()));
-    updateEventCount();
-
-    console.log(`Loaded ${data.events.length} events`);
+    console.log(`Received ${(result as any).events?.length || 0} historical events`);
+    state.subscribed = true;
+    updateConnectionStatus();
   } catch (err) {
-    console.error('Failed to load events:', err);
-    alert('Failed to load events');
+    console.error('Failed to set filters:', err);
   }
 }
 
@@ -195,7 +216,7 @@ function updateConnectionStatus() {
 
   if (state.wsConnected) {
     indicator.className = 'status-indicator connected';
-    text.textContent = state.subscribed ? 'Subscribed' : 'Connected';
+    text.textContent = state.subscribed ? 'Connected & Listening' : 'Connected';
   } else {
     indicator.className = 'status-indicator disconnected';
     text.textContent = 'Disconnected';
@@ -209,21 +230,15 @@ async function initWebSocket() {
     state.wsConnected = true;
     updateConnectionStatus();
     console.log('WebSocket connected');
+    // Set initial filters when connected
+    updateFilters();
   });
 
-  wsClient.onMessageHandler((msg) => {
-    if (msg.method === 'query_response') {
-      const data = msg.data;
-      for (const event of data.events) {
-        state.events.set(event.id, event);
-      }
-      updateMapLayers(Array.from(state.events.values()));
-      updateEventCount();
-    } else if (msg.method === 'event') {
-      state.events.set(msg.data.id, msg.data);
-      updateMapLayers(Array.from(state.events.values()));
-      updateEventCount();
-    }
+  wsClient.onEventHandler((eventData) => {
+    console.log('Received event:', eventData.type);
+    state.events.set(eventData.id, eventData);
+    updateMapLayers(Array.from(state.events.values()));
+    updateEventCount();
   });
 
   wsClient.onCloseHandler(() => {
@@ -245,52 +260,17 @@ async function initWebSocket() {
 }
 
 function setupEventListeners() {
-  // Type filter
-  const typeFilter = document.getElementById('type-filter') as HTMLSelectElement;
-  typeFilter.addEventListener('change', (e) => {
-    state.selectedEventType = (e.target as HTMLSelectElement).value || null;
-    loadEvents();
-  });
-
-  // Load button
-  document.getElementById('load-btn')?.addEventListener('click', loadEvents);
-
-  // Subscribe button
-  document.getElementById('subscribe-btn')?.addEventListener('click', () => {
-    if (wsClient.isConnected()) {
-      const typeParam = state.selectedEventType || undefined;
-      wsClient.send({
-        method: 'subscribe',
-        params: {
-          type: typeParam,
-        },
-      });
-      state.subscribed = true;
-      (document.getElementById('subscribe-btn') as HTMLElement).style.display = 'none';
-      (document.getElementById('unsubscribe-btn') as HTMLElement).style.display = 'block';
-      updateConnectionStatus();
-    }
-  });
-
-  // Unsubscribe button
-  document.getElementById('unsubscribe-btn')?.addEventListener('click', () => {
-    if (wsClient.isConnected()) {
-      wsClient.send({ method: 'unsubscribe' });
-      state.subscribed = false;
-      (document.getElementById('subscribe-btn') as HTMLElement).style.display = 'block';
-      (document.getElementById('unsubscribe-btn') as HTMLElement).style.display = 'none';
-      updateConnectionStatus();
-    }
-  });
-
-  // Layer visibility toggles
+  // Layer visibility toggles - these now also set filters
   const eventTypes = ['incident', 'speed', 'travel_time', 'road_work', 'message_sign'];
   for (const type of eventTypes) {
     const checkbox = document.getElementById(`layer-${type}`) as HTMLInputElement;
     checkbox?.addEventListener('change', (e) => {
       const visibility = (e.target as HTMLInputElement).checked ? 'visible' : 'none';
       map.setLayoutProperty(`layer-${type}`, 'visibility', visibility);
-      state.layerVisibility[type] = visibility === 'visible';
+      state.layerVisibility[type as keyof typeof state.layerVisibility] = visibility === 'visible';
+
+      // Update filters when layer visibility changes
+      updateFilters();
     });
   }
 }
@@ -302,7 +282,6 @@ async function main() {
     await initMap();
     await initWebSocket();
     setupEventListeners();
-    await loadEvents();
 
     console.log('✅ App ready');
   } catch (err) {

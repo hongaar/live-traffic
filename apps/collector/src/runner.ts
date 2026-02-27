@@ -1,6 +1,9 @@
 import type { Adapter, RetentionConfig } from '@live-traffic/types';
 import { runRetention } from '@live-traffic/db';
+import { getLogger } from '@live-traffic/logger';
 import type { AdapterConfig } from './types';
+
+const logger = getLogger('Runner');
 
 export class AdapterRunner {
   private adapters: Map<string, Adapter> = new Map();
@@ -27,12 +30,12 @@ export class AdapterRunner {
       throw new Error(`Adapter with id "${adapter.id}" already registered`);
     }
     this.adapters.set(adapter.id, adapter);
-    console.log(`[Runner] Registered adapter: ${adapter.id}`);
+    logger.debug(`Registered adapter: ${adapter.id}`);
   }
 
   async start(): Promise<void> {
-    console.log('[Runner] Starting adapters...');
-    console.log('[Runner] Adapter config:', this.config);
+    logger.info('Starting adapters...');
+    logger.verbose('Adapter config', this.config);
 
     const promises = Array.from(this.adapters.values())
       .filter((adapter) => {
@@ -41,7 +44,7 @@ export class AdapterRunner {
       })
       .map((adapter) =>
         adapter.start().catch((err: unknown) => {
-          console.error(`[Runner] Failed to start adapter ${adapter.id}:`, err);
+          logger.error(`Failed to start adapter ${adapter.id}`, err);
         })
       );
 
@@ -49,17 +52,17 @@ export class AdapterRunner {
 
     // Schedule retention job (daily)
     this.retentionTimer = setInterval(() => {
-      console.log('[Runner] Running retention job...');
+      logger.info('Running retention job...');
       runRetention(this.retentionConfig).catch((err) => {
-        console.error('[Runner] Retention job failed:', err);
+        logger.error('Retention job failed', err);
       });
     }, 24 * 60 * 60 * 1000); // 24 hours
 
-    console.log('[Runner] All adapters started');
+    logger.info('All adapters started');
   }
 
   async stop(): Promise<void> {
-    console.log('[Runner] Stopping all adapters...');
+    logger.info('Stopping all adapters...');
 
     if (this.retentionTimer) {
       clearInterval(this.retentionTimer);
@@ -67,11 +70,11 @@ export class AdapterRunner {
 
     const promises = Array.from(this.adapters.values()).map((adapter) =>
       adapter.stop().catch((err: unknown) => {
-        console.error(`[Runner] Error stopping adapter ${adapter.id}:`, err);
+        logger.error(`Error stopping adapter ${adapter.id}`, err);
       })
     );
 
     await Promise.all(promises);
-    console.log('[Runner] All adapters stopped');
+    logger.info('All adapters stopped');
   }
 }

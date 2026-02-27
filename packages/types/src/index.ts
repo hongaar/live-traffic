@@ -136,56 +136,49 @@ export type EventListResponse = z.infer<typeof EventListResponseSchema>;
 
 // WebSocket message types
 
-export const WSQueryMessageSchema = z.object({
-  method: z.literal('query'),
-  params: EventQueryParamsSchema,
+// Client messages
+export const WSClientSetFiltersMessageSchema = z.object({
+  method: z.literal('set_filters'),
+  id: z.string(),
+  filters: EventQueryParamsSchema,
 });
 
-export type WSQueryMessage = z.infer<typeof WSQueryMessageSchema>;
+export type WSClientSetFiltersMessage = z.infer<typeof WSClientSetFiltersMessageSchema>;
 
-export const WSSubscribeParamsSchema = z.object({
-  type: z.string().optional(),
-  bbox: z.string().optional(),
-});
-
-export const WSSubscribeMessageSchema = z.object({
-  method: z.literal('subscribe'),
-  params: WSSubscribeParamsSchema,
-});
-
-export type WSSubscribeMessage = z.infer<typeof WSSubscribeMessageSchema>;
-
-export const WSUnsubscribeMessageSchema = z.object({
-  method: z.literal('unsubscribe'),
-});
-
-export type WSUnsubscribeMessage = z.infer<typeof WSUnsubscribeMessageSchema>;
-
-export const WSClientMessageSchema = z.union([
-  WSQueryMessageSchema,
-  WSSubscribeMessageSchema,
-  WSUnsubscribeMessageSchema,
-]);
+export const WSClientMessageSchema = WSClientSetFiltersMessageSchema;
 
 export type WSClientMessage = z.infer<typeof WSClientMessageSchema>;
 
-export const WSQueryResponseSchema = z.object({
-  method: z.literal('query_response'),
-  data: EventListResponseSchema,
+// Server response messages
+export const WSHistoricalEventsSchema = z.object({
+  type: z.literal('historical_events'),
+  inResponseTo: z.string(),
+  events: z.array(AnyEventSchema),
+  total: z.number(),
+  limit: z.number(),
 });
 
-export type WSQueryResponse = z.infer<typeof WSQueryResponseSchema>;
+export type WSHistoricalEvents = z.infer<typeof WSHistoricalEventsSchema>;
 
 export const WSEventMessageSchema = z.object({
-  method: z.literal('event'),
+  type: z.literal('event'),
   data: AnyEventSchema,
 });
 
 export type WSEventMessage = z.infer<typeof WSEventMessageSchema>;
 
+export const WSErrorMessageSchema = z.object({
+  type: z.literal('error'),
+  inResponseTo: z.string().optional(),
+  message: z.string(),
+});
+
+export type WSErrorMessage = z.infer<typeof WSErrorMessageSchema>;
+
 export const WSServerMessageSchema = z.union([
-  WSQueryResponseSchema,
+  WSHistoricalEventsSchema,
   WSEventMessageSchema,
+  WSErrorMessageSchema,
 ]);
 
 export type WSServerMessage = z.infer<typeof WSServerMessageSchema>;
