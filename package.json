@@ -1,0 +1,27 @@
+{
+  "name": "live-traffic",
+  "version": "0.1.0",
+  "description": "Real-time traffic data collection, storage, and visualization",
+  "private": true,
+  "packageManager": "bun@1.3.8",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "db:migrate": "turbo run db:migrate --filter=@live-traffic/db",
+    "db:generate": "turbo run db:generate --filter=@live-traffic/db"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.3.3",
+    "turbo": "^1.11.2"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}

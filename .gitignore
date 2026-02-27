@@ -1,0 +1,16 @@
+node_modules
+dist
+build
+*.log
+.DS_Store
+.env
+.env.local
+.env.*.local
+bun.lockb
+.turbo
+.sqlite
+.sqlite-journal
+.idea
+*.db
+*.db-shm
+*.db-wal

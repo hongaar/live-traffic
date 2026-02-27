@@ -1,0 +1,22 @@
+{
+  "name": "@live-traffic/collector",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "collector": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "bun src/index.ts"
+  },
+  "dependencies": {
+    "@live-traffic/db": "workspace:*",
+    "@live-traffic/types": "workspace:*",
+    "fast-xml-parser": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "typescript": "^5.3.3",
+    "bun-types": "latest"
+  }
+}

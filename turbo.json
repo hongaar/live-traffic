@@ -1,0 +1,30 @@
+{
+  "extends": ["//"],
+  "pipeline": {
+    "typecheck": {
+      "outputs": [],
+      "cache": false
+    },
+    "lint": {
+      "outputs": [],
+      "cache": false
+    },
+    "build": {
+      "outputs": ["dist/**"],
+      "cache": true,
+      "dependsOn": ["^build"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "db:migrate": {
+      "outputs": [],
+      "cache": false
+    },
+    "db:generate": {
+      "outputs": ["src/**"],
+      "cache": false
+    }
+  }
+}

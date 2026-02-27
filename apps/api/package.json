@@ -1,0 +1,22 @@
+{
+  "name": "@live-traffic/api",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "api": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "bun src/index.ts"
+  },
+  "dependencies": {
+    "@live-traffic/db": "workspace:*",
+    "@live-traffic/types": "workspace:*",
+    "hono": "^3.11.12"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "typescript": "^5.3.3",
+    "bun-types": "latest"
+  }
+}
