@@ -21,6 +21,7 @@ let state: MapState = {
 
 let map: maplibregl.Map;
 let wsClient: WSClient;
+let mapReady = false;
 
 const eventTypeColors: Record<string, string> = {
   incident: '#e74c3c',
@@ -42,9 +43,14 @@ async function initMap() {
     zoom: 7,
   });
 
-  map.on('load', () => {
-    // Add sources and layers for each event type
-    addEventLayers();
+  return new Promise<void>((resolve) => {
+    map.on('load', () => {
+      // Add sources and layers for each event type
+      addEventLayers();
+      mapReady = true;
+      console.log('✅ Map ready and layers added');
+      resolve();
+    });
   });
 }
 
@@ -117,6 +123,11 @@ function addEventLayers() {
 }
 
 function updateMapLayers(events: AnyEvent[]) {
+  if (!mapReady) {
+    console.warn('Map not ready yet, skipping layer update');
+    return;
+  }
+
   const featuresByType: Record<string, any[]> = {
     incident: [],
     speed: [],
@@ -127,6 +138,13 @@ function updateMapLayers(events: AnyEvent[]) {
 
   for (const event of events) {
     if (!featuresByType[event.type]) {
+      console.warn(`Unknown event type: ${event.type}`);
+      continue;
+    }
+
+    // Validate geometry
+    if (!event.geometry || !event.geometry.coordinates) {
+      console.warn(`Event ${event.id} missing geometry or coordinates`, event);
       continue;
     }
 
@@ -157,6 +175,9 @@ function updateMapLayers(events: AnyEvent[]) {
         type: 'FeatureCollection',
         features,
       });
+      console.log(`Updated layer-${type} with ${features.length} features`);
+    } else {
+      console.warn(`Source source-${type} not found`);
     }
   }
 }
@@ -187,6 +208,20 @@ async function updateFilters() {
     return;
   }
 
+  if (!mapReady) {
+    console.log('Map not ready yet, waiting...');
+    // Wait for map to be ready
+    const maxWaitTime = 10000;
+    const startTime = Date.now();
+    while (!mapReady && Date.now() - startTime < maxWaitTime) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (!mapReady) {
+      console.error('Map failed to initialize within timeout');
+      return;
+    }
+  }
+
   try {
     const filters: EventQueryParams = {
       type: getEnabledTypesFilter(),
@@ -206,7 +241,7 @@ async function updateFilters() {
     }
     
     // Update map layers with all events
-    if (historicalEvents.length > 0) {
+    if (historicalEvents.length > 0 && mapReady) {
       updateMapLayers(Array.from(state.events.values()));
       updateEventCount();
     }
@@ -250,8 +285,10 @@ async function initWebSocket() {
   wsClient.onEventHandler((eventData) => {
     console.log('Received event:', eventData.type);
     state.events.set(eventData.id, eventData);
-    updateMapLayers(Array.from(state.events.values()));
-    updateEventCount();
+    if (mapReady) {
+      updateMapLayers(Array.from(state.events.values()));
+      updateEventCount();
+    }
   });
 
   wsClient.onCloseHandler(() => {
