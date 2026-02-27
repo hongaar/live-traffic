@@ -222,11 +222,19 @@ VITE_WS_URL=ws://localhost:3000/ws
 
 ### All Services (Development)
 
+**IMPORTANT: Use file-based database for shared data between services!**
+
 ```bash
+# With file-based database (shared data between all services) ✅
+DB_PATH=./live-traffic.db bun run dev
+
+# Without DB_PATH (in-memory, services have separate databases) ❌ Don't use this!
 bun run dev
 ```
 
 Starts collector, API, and web app in parallel using Turborepo.
+
+**Why file-based?** The collector writes events to the database. If each service has its own in-memory database, the API won't see the data. Using `DB_PATH=./live-traffic.db` creates a shared file-based SQLite database that all services can access.
 
 ### Individual Services
 
