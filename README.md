@@ -297,6 +297,55 @@ In **debug** level, the detailed data is omitted for cleaner output:
 2026-02-27T10:15:24.200Z DEBUG   [NDW] GET https://opendata.ndw.nu/incidents 200 (300ms)
 ```
 
+### Quick Testing: Standalone Adapter Runner
+
+For rapid testing and validation without starting the full dev server, use the standalone adapter runner:
+
+```bash
+# Run adapter once, using cached data (no API calls)
+NDW_USE_CACHE=true bun --cwd apps/collector run-once.ts
+
+# With verbose logging to see all parsing details
+NDW_USE_CACHE=true LOG_LEVEL=verbose bun --cwd apps/collector run-once.ts
+```
+
+**Features:**
+- ⚡ Fast execution (~30 seconds to parse ~160k events)
+- 📦 No dev server overhead
+- 🎯 Automatic cleanup and exit
+- 📊 Grouped event counts by type
+- 🔍 Sample events from each type for inspection
+
+**Example Output:**
+```
+✅ Adapter completed. Total events in database: 107,937
+Events by type:
+  incident: 18
+  message_sign: 708
+  road_work: 11,783
+  speed: 18,034
+  travel_time: 77,394
+
+Sample events (one per type):
+  - incident: Vehicle obstruction: brokenDownVehicle
+  - message_sign: VMS Message
+  - road_work: Road work: roadworkHindrance
+  - travel_time: N/A (duration in seconds)
+  - speed: N/A (speed in km/h)
+```
+
+**Cache Management:**
+```bash
+# Clear cache to force fresh fetch from NDW API
+rm -rf apps/collector/.ndw-cache/
+
+# Use cache (default when NDW_USE_CACHE=true)
+NDW_USE_CACHE=true bun --cwd apps/collector run-once.ts
+
+# Force fresh fetch (ignore cache)
+NDW_USE_CACHE=false bun --cwd apps/collector run-once.ts
+```
+
 **Verbose Mode Highlights:**
 
 - Full request/response bodies for adapter feeds
@@ -330,7 +379,9 @@ curl http://localhost:3000/health
 ```
 
 **Query Parameters:**
-- `type` – Event type (incident, speed, travel_time, road_work, message_sign)
+- `type` – Event type(s): `incident`, `speed`, `travel_time`, `road_work`, `message_sign`
+  - Single type: `?type=incident`
+  - Multiple types: `?type=incident&type=speed` or pass as array in JSON
 - `bbox` – Bounding box (minLon,minLat,maxLon,maxLat)
 - `since` – Unix timestamp (ms) for start of range
 - `until` – Unix timestamp (ms) for end of range
