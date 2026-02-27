@@ -143,31 +143,63 @@ bun install
 
 ### 2. Database
 
+The database layer is driver-agnostic and supports both **SQLite** (development) and **PostgreSQL** (production).
+
 #### Local Development (SQLite via Bun) – Default
 
 No setup required. Database is created automatically on first run.
 
 ```bash
+# Use file-based SQLite (default)
 export DB_PATH=./live-traffic.db
-# or in-memory:
+
+# Or use in-memory SQLite (for testing)
 export DB_PATH=:memory:
 ```
 
+SQLite is built into Bun, so no additional dependencies are needed for local development.
+
 #### Production (PostgreSQL)
+
+For production deployments with higher concurrency and scalability requirements:
 
 ```bash
 export DB_KIND=postgres
 export DATABASE_URL=postgresql://user:password@localhost:5432/live_traffic
 ```
 
+Alternatively, use `DB_URL`:
+
+```bash
+export DB_URL=postgresql://user:password@localhost:5432/live_traffic
+```
+
+**Setup PostgreSQL:**
+
+```sql
+-- Create database
+CREATE DATABASE live_traffic;
+
+-- Connect and run migrations (handled automatically on first init)
+psql -U user -d live_traffic
+```
+
+The database client automatically detects the driver via `DB_KIND` environment variable and initializes the appropriate schema.
+
 ### 3. Environment Variables
 
 Copy `.env.example` to `.env`:
 
 ```bash
-# Database
-DB_PATH=./live-traffic.db
+# Database - Choose ONE of these configurations:
+
+# LOCAL DEVELOPMENT (SQLite):
 DB_KIND=sqlite
+DB_PATH=./live-traffic.db
+
+# OR PRODUCTION (PostgreSQL):
+DB_KIND=postgres
+DATABASE_URL=postgresql://user:password@localhost:5432/live_traffic
 
 # API Server
 PORT=3000
@@ -177,6 +209,14 @@ CORS_ORIGIN=http://localhost:5173
 VITE_API_BASE=http://localhost:3000
 VITE_WS_URL=ws://localhost:3000/ws
 ```
+
+**Database Selection:**
+
+| Env Var | Default | Notes |
+|---------|---------|-------|
+| `DB_KIND` | `sqlite` | Switch between `sqlite` or `postgres` |
+| `DB_PATH` | `:memory:` | For SQLite; can be file path or `:memory:` |
+| `DATABASE_URL` | — | For PostgreSQL; required when `DB_KIND=postgres` |
 
 ## Running
 
@@ -420,6 +460,182 @@ import { HereAdapter } from '@live-traffic/adapter-here';
 runner.register(new HereAdapter());
 ```
 
+## Database Abstraction
+
+The `@live-traffic/db` package provides a database-agnostic interface that supports multiple drivers:
+
+### Architecture
+
+```
+┌─────────────────────────┐
+│   Database Client       │
+│  (packages/db/client)   │
+│ - Query helpers         │
+│ - Retention policies    │
+└────────────┬────────────┘
+             │
+    ┌────────┴────────┐
+    ▼                 ▼
+┌─────────┐      ┌──────────┐
+│ SQLite  │      │PostgreSQL│
+│ Driver  │      │  Driver  │
+└────┬────┘      └────┬─────┘
+     │                │
+     ▼                ▼
+┌──────────────────────────┐
+│   Storage Layer          │
+│ (bun:sqlite or pg)       │
+└──────────────────────────┘
+```
+
+### Supported Drivers
+
+| Driver | Env | Setup | Use Case |
+|--------|-----|-------|----------|
+| **SQLite** | `DB_KIND=sqlite` | Automatic | Local dev, testing, small deployments |
+| **PostgreSQL** | `DB_KIND=postgres` | Manual (create DB) | Production, high concurrency |
+
+### Driver API
+
+Both drivers implement the same interface:
+
+```typescript
+export interface DatabaseDriver {
+  run(sql: string, params?: unknown[]): Promise<void>;
+  get(sql: string, params?: unknown[]): Promise<any | null>;
+  all(sql: string, params?: unknown[]): Promise<any[]>;
+  close(): Promise<void>;
+}
+```
+
+### Query Differences Handled
+
+The client automatically handles database-specific SQL syntax:
+
+- **Parameter placeholders**: SQLite uses `?`, PostgreSQL uses `$1`, `$2`, etc.
+- **Upsert syntax**: Different `ON CONFLICT` vs `ON DUPLICATE KEY` syntax
+- **JSON operations**: SQLite uses `json_extract()`, PostgreSQL uses `::jsonb`
+
+### Adding New Drivers
+
+To support another database (MySQL, CockroachDB, etc.):
+
+1. Create `packages/db/src/drivers/{name}.ts`
+2. Implement `DatabaseDriver` interface
+3. Update `createDriver()` in `client.ts` to detect and instantiate
+
+Example:
+
+```typescript
+// packages/db/src/drivers/mysql.ts
+export class MysqlDriver implements DatabaseDriver {
+  private connection: any;
+  
+  constructor() {
+    // Initialize MySQL connection
+  }
+  
+  async run(sql: string, params?: unknown[]): Promise<void> { }
+  async get(sql: string, params?: unknown[]): Promise<any | null> { }
+  async all(sql: string, params?: unknown[]): Promise<any[]> { }
+  async close(): Promise<void> { }
+}
+
+// Update createDriver() in client.ts
+if (dbKind === 'mysql') {
+  const { MysqlDriver } = await import('./drivers/mysql');
+  return new MysqlDriver();
+}
+```
+
+## Database Abstraction
+
+The `@live-traffic/db` package provides a database-agnostic interface that supports multiple drivers:
+
+### Architecture
+
+```
+┌─────────────────────────┐
+│   Database Client       │
+│  (packages/db/client)   │
+│ - Query helpers         │
+│ - Retention policies    │
+└────────────┬────────────┘
+             │
+    ┌────────┴────────┐
+    ▼                 ▼
+┌─────────┐      ┌──────────┐
+│ SQLite  │      │PostgreSQL│
+│ Driver  │      │  Driver  │
+└────┬────┘      └────┬─────┘
+     │                │
+     ▼                ▼
+┌──────────────────────────┐
+│   Storage Layer          │
+│ (bun:sqlite or pg)       │
+└──────────────────────────┘
+```
+
+### Supported Drivers
+
+| Driver | Env | Setup | Use Case |
+|--------|-----|-------|----------|
+| **SQLite** | `DB_KIND=sqlite` | Automatic | Local dev, testing, small deployments |
+| **PostgreSQL** | `DB_KIND=postgres` | Manual (create DB) | Production, high concurrency |
+
+### Driver API
+
+Both drivers implement the same interface:
+
+```typescript
+export interface DatabaseDriver {
+  run(sql: string, params?: unknown[]): Promise<void>;
+  get(sql: string, params?: unknown[]): Promise<any | null>;
+  all(sql: string, params?: unknown[]): Promise<any[]>;
+  close(): Promise<void>;
+}
+```
+
+### Query Differences Handled
+
+The client automatically handles database-specific SQL syntax:
+
+- **Parameter placeholders**: SQLite uses `?`, PostgreSQL uses `$1`, `$2`, etc.
+- **Upsert syntax**: Different `ON CONFLICT` vs `ON DUPLICATE KEY` syntax
+- **JSON operations**: SQLite uses `json_extract()`, PostgreSQL uses `::jsonb`
+
+### Adding New Drivers
+
+To support another database (MySQL, CockroachDB, etc.):
+
+1. Create `packages/db/src/drivers/{name}.ts`
+2. Implement `DatabaseDriver` interface
+3. Update `createDriver()` in `client.ts` to detect and instantiate
+
+Example:
+
+```typescript
+// packages/db/src/drivers/mysql.ts
+export class MysqlDriver implements DatabaseDriver {
+  private connection: any;
+  
+  constructor() {
+    // Initialize MySQL connection
+  }
+  
+  async run(sql: string, params?: unknown[]): Promise<void> { }
+  async get(sql: string, params?: unknown[]): Promise<any | null> { }
+  async all(sql: string, params?: unknown[]): Promise<any[]> { }
+  async close(): Promise<void> { }
+}
+
+// Update createDriver() in client.ts
+if (dbKind === 'mysql') {
+  const { MysqlDriver } = await import('./drivers/mysql');
+  return new MysqlDriver();
+}
+```
+
 ## Data Retention
 
 Events are automatically deleted based on type to prevent unbounded storage growth:
@@ -480,7 +696,7 @@ bun run build
 | **Runtime** | Bun | Fast JavaScript runtime with native SQLite |
 | **Monorepo** | Turborepo + Bun Workspaces | Fast builds, dependency management |
 | **Language** | TypeScript | Strict, fully typed |
-| **Database** | SQLite (dev) / PostgreSQL (prod) | Lightweight + scalable |
+| **Database** | SQLite (dev) / PostgreSQL (prod) | Lightweight + scalable, driver-agnostic abstraction |
 | **API Framework** | Hono | Lightweight, supports WebSocket, REST |
 | **Frontend** | Vite + TypeScript | Fast builds, ES modules |
 | **Map Library** | MapLibre GL JS | Open source, vector tiles, WebGL |
