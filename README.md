@@ -223,22 +223,29 @@ VITE_WS_URL=ws://localhost:3000/ws
 ### All Services (Development)
 
 ```bash
-# Start all services in parallel
-bun run dev
+# Start all services with shared database ✅
+DB_PATH=./live-traffic.db bun run dev
 ```
 
-Starts collector, API, and web app in parallel using Turborepo.
+Starts collector, API, and web app in parallel using Turborepo with a **shared file-based SQLite database**.
 
-**Note on data sharing:** In development, each service uses its own in-memory SQLite database. The **collector** service inserts events, and the **API** service serves them independently. The **web app** receives events via WebSocket that the API broadcasts.
+**Key points:**
+- Both collector and API use the same database file
+- Collector writes events; API serves them
+- WAL mode enables safe concurrent access
+- Perfect for development - no data loss between restarts
 
-To see events in the web app:
-1. Wait for the collector to finish fetching (watch logs for "Fetched 5/5 feeds")
-2. Open http://localhost:5173 in your browser  
-3. The map will display events that the API has collected
+Once running:
+- **API**: http://localhost:3000 (REST + WebSocket)
+- **Web**: http://localhost:5173 (MapLibre dashboard)
+- **Collector**: Runs in background, logs to stdout
 
-Or query via REST API:
+Verify it's working:
 ```bash
-curl http://localhost:3000/api/events?limit=10
+# Check events via REST
+curl http://localhost:3000/api/events?limit=5
+
+# Expected output: 5 event objects with all types (incident, speed, travel_time, etc.)
 ```
 
 ### Individual Services
