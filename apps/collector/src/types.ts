@@ -1,11 +1,17 @@
-export interface Adapter {
-  id: string;
-  start(): Promise<void>;
-  stop(): Promise<void>;
+// Adapter configuration
+export interface AdapterConfig {
+  adapters: Array<{
+    id: string;
+    enabled: boolean;
+  }>;
 }
 
-export interface AdapterConfig {
-  schedule?: string; // cron-like or interval in ms
-  mode?: 'poll' | 'subscribe';
-  pollIntervalMs?: number;
-}
+// Export default adapter configuration
+export const defaultAdapterConfig: AdapterConfig = {
+  adapters: [
+    {
+      id: 'ndw',
+      enabled: true,
+    },
+  ],
+};

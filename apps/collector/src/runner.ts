@@ -1,13 +1,15 @@
-import type { Adapter } from './types';
+import type { Adapter, RetentionConfig } from '@live-traffic/types';
 import { runRetention } from '@live-traffic/db';
-import type { RetentionConfig } from '@live-traffic/types';
+import type { AdapterConfig } from './types';
 
 export class AdapterRunner {
   private adapters: Map<string, Adapter> = new Map();
+  private config: AdapterConfig;
   private retentionConfig: RetentionConfig;
   private retentionTimer: NodeJS.Timeout | null = null;
 
-  constructor(retentionConfig?: RetentionConfig) {
+  constructor(config: AdapterConfig, retentionConfig?: RetentionConfig) {
+    this.config = config;
     this.retentionConfig = retentionConfig || {
       policies: [
         { type: 'incident', ttlDays: 7 },
@@ -29,13 +31,19 @@ export class AdapterRunner {
   }
 
   async start(): Promise<void> {
-    console.log('[Runner] Starting all adapters...');
+    console.log('[Runner] Starting adapters...');
+    console.log('[Runner] Adapter config:', this.config);
 
-    const promises = Array.from(this.adapters.values()).map((adapter) =>
-      adapter.start().catch((err: unknown) => {
-        console.error(`[Runner] Failed to start adapter ${adapter.id}:`, err);
+    const promises = Array.from(this.adapters.values())
+      .filter((adapter) => {
+        const adapterConfig = this.config.adapters.find((a) => a.id === adapter.id);
+        return adapterConfig?.enabled !== false;
       })
-    );
+      .map((adapter) =>
+        adapter.start().catch((err: unknown) => {
+          console.error(`[Runner] Failed to start adapter ${adapter.id}:`, err);
+        })
+      );
 
     await Promise.all(promises);
 

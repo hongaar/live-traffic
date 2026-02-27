@@ -7,7 +7,7 @@ import {
   type MessageSign,
 } from '@live-traffic/types';
 import { upsertEvents, upsertSource, getSource } from '@live-traffic/db';
-import type { Adapter } from '../../types';
+import type { Adapter } from '@live-traffic/types';
 
 const NDW_BASE_URL = 'https://opendata.ndw.nu';
 

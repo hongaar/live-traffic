@@ -12,7 +12,7 @@
   "dependencies": {
     "@live-traffic/db": "workspace:*",
     "@live-traffic/types": "workspace:*",
-    "fast-xml-parser": "^4.3.5"
+    "@live-traffic/adapter-ndw": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",

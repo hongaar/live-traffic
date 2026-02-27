@@ -1,6 +1,7 @@
 import { initDb, closeDb } from '@live-traffic/db';
+import { NDWAdapter } from '@live-traffic/adapter-ndw';
 import { AdapterRunner } from './runner';
-import { NDWAdapter } from './adapters/ndw';
+import { defaultAdapterConfig } from './types';
 
 async function main() {
   console.log('🚀 Live Traffic Collector starting...');
@@ -11,7 +12,7 @@ async function main() {
     await initDb();
 
     // Create and configure runner
-    const runner = new AdapterRunner();
+    const runner = new AdapterRunner(defaultAdapterConfig);
 
     // Register adapters
     runner.register(new NDWAdapter());

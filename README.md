@@ -18,6 +18,31 @@ bun run dev
 
 ## Architecture
 
+Data flows from NDW through modular adapters to a normalized database, then served via REST and WebSocket APIs:
+
+```
+NDW opendata ──► Collector Service ──► SQLite/PostgreSQL ──┬──► API Service ──► Web App
+     (DATEX II)  (adapter-ndw)        (normalized events)  │   (REST/WS)    (MapLibre)
+                                      (adapter state)      │
+                                      (retention policy)   └──► External Consumers
+```
+
+**Key Design Pattern: Adapter Architecture**
+
+- **Adapters**: Independent packages (`@live-traffic/adapter-*`) that fetch, parse, and normalize data
+- **Collector**: Loads adapters via configuration and manages their lifecycle
+- **Configuration-Driven**: `AdapterConfig` defines which adapters are enabled/disabled
+- **Easily Extensible**: Add new adapters without modifying collector code
+
+### Packages
+
+| Package | Purpose | Status |
+|---------|---------|--------|
+| `@live-traffic/types` | Zod schemas, interfaces, API contracts | ✅ Complete |
+| `@live-traffic/db` | SQLite/PostgreSQL client, retention | ✅ Complete |
+| `@live-traffic/adapter-ndw` | Dutch traffic data (NDW DATEX II) | ✅ Complete |
+| `@live-traffic/adapter-*` | Future adapters (HERE, Google, etc.) | 📋 Planned |
+
 ```
 ┌─────────────────┐
 │  NDW opendata   │
@@ -71,9 +96,7 @@ live-traffic/
 │   │   └── src/
 │   │       ├── index.ts        # Entry point, graceful shutdown
 │   │       ├── runner.ts       # Adapter runner + retention scheduler
-│   │       ├── types.ts        # Adapter interface
-│   │       └── adapters/ndw/
-│   │           └── index.ts    # NDW adapter (fetch, parse, normalize)
+│   │       └── types.ts        # Adapter configuration
 │   ├── api/                    # REST + WebSocket API
 │   │   └── src/
 │   │       └── index.ts        # Hono app, routes, WebSocket handler
@@ -85,9 +108,12 @@ live-traffic/
 │       │   └── types.ts        # App state types
 │       └── vite.config.ts      # Vite configuration
 ├── packages/
+│   ├── adapter-ndw/            # NDW data source adapter
+│   │   └── src/
+│   │       └── index.ts        # NDW adapter (fetch, parse, normalize)
 │   ├── types/                  # Shared TypeScript + Zod schemas
 │   │   └── src/
-│   │       └── index.ts        # Event types, API contracts
+│   │       └── index.ts        # Event types, API contracts, adapter interface
 │   └── db/                     # Database client
 │       └── src/
 │           ├── schema.ts       # SQLite schema definition
@@ -359,6 +385,41 @@ All events share common fields, with type-specific attributes:
 }
 ```
 
+### Extending with New Adapters
+
+To add a new data source (e.g., HERE traffic API), create a new adapter package:
+
+1. **Create package**: `packages/adapter-here/`
+2. **Implement `Adapter` interface**: From `@live-traffic/types`
+3. **Register in collector**: Add to `AdapterConfig` in `apps/collector/src/types.ts`
+4. **Enable via config**: Set `enabled: true` for the adapter
+
+Example:
+
+```typescript
+// packages/adapter-here/src/index.ts
+import type { Adapter } from '@live-traffic/types';
+
+export class HereAdapter implements Adapter {
+  id = 'here';
+  
+  async start() { /* fetch and normalize HERE data */ }
+  async stop() { /* cleanup */ }
+}
+
+// apps/collector/src/types.ts
+export const defaultAdapterConfig: AdapterConfig = {
+  adapters: [
+    { id: 'ndw', enabled: true },
+    { id: 'here', enabled: false }, // Add here
+  ],
+};
+
+// apps/collector/src/index.ts
+import { HereAdapter } from '@live-traffic/adapter-here';
+runner.register(new HereAdapter());
+```
+
 ## Data Retention
 
 Events are automatically deleted based on type to prevent unbounded storage growth:
@@ -425,6 +486,7 @@ bun run build
 | **Map Library** | MapLibre GL JS | Open source, vector tiles, WebGL |
 | **Validation** | Zod | Runtime type safety |
 | **XML Parsing** | fast-xml-parser | Efficient DATEX II parsing |
+| **Adapter Architecture** | Plugin pattern | Modular, extensible data sources |
 
 ## Architecture Highlights
 
@@ -446,17 +508,18 @@ bun run build
 
 ## File Statistics
 
-- **36 files** (TS, config, assets)
-- **~2,730 lines** of code + comments
-- **5 apps/packages** fully typed
+- **37 files** (TS, config, assets) across 6 packages
+- **~2,900 lines** of code + comments
+- **6 apps/packages** fully typed (types, db, adapter-ndw, collector, api, web)
 - **0 TypeScript errors** in strict mode
+- **Modular architecture**: Adapters packaged independently
 
 ## Future Enhancements
 
+- [ ] **Additional Adapters**: HERE, Google Maps API, regional services
 - [ ] **Real DATEX II Parsing**: Replace skeleton parsers with production-ready XML parsing
 - [ ] **PostgreSQL Integration**: Full support with migrations
 - [ ] **TimescaleDB**: Hypertable support for time-series optimization
-- [ ] **Additional Adapters**: HERE, Google Maps API, regional services
 - [ ] **Data Export**: CSV, GeoJSON download
 - [ ] **Historical Analysis**: Statistics, trends, heatmaps
 - [ ] **Mobile App**: React Native or PWA

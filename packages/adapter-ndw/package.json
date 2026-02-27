@@ -1,0 +1,20 @@
+{
+  "name": "@live-traffic/adapter-ndw",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@live-traffic/types": "workspace:*",
+    "@live-traffic/db": "workspace:*",
+    "fast-xml-parser": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "typescript": "^5.3.3"
+  }
+}

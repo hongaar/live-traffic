@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+// Adapter interface for data sources
+export interface Adapter {
+  id: string;
+  start(): Promise<void>;
+  stop(): Promise<void>;
+}
+
 // Geometry: GeoJSON Point or LineString with optional road reference
 export const GeometrySchema = z.union([
   z.object({
