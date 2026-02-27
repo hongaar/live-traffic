@@ -222,19 +222,24 @@ VITE_WS_URL=ws://localhost:3000/ws
 
 ### All Services (Development)
 
-**IMPORTANT: Use file-based database for shared data between services!**
-
 ```bash
-# With file-based database (shared data between all services) ✅
-DB_PATH=./live-traffic.db bun run dev
-
-# Without DB_PATH (in-memory, services have separate databases) ❌ Don't use this!
+# Start all services in parallel
 bun run dev
 ```
 
 Starts collector, API, and web app in parallel using Turborepo.
 
-**Why file-based?** The collector writes events to the database. If each service has its own in-memory database, the API won't see the data. Using `DB_PATH=./live-traffic.db` creates a shared file-based SQLite database that all services can access.
+**Note on data sharing:** In development, each service uses its own in-memory SQLite database. The **collector** service inserts events, and the **API** service serves them independently. The **web app** receives events via WebSocket that the API broadcasts.
+
+To see events in the web app:
+1. Wait for the collector to finish fetching (watch logs for "Fetched 5/5 feeds")
+2. Open http://localhost:5173 in your browser  
+3. The map will display events that the API has collected
+
+Or query via REST API:
+```bash
+curl http://localhost:3000/api/events?limit=10
+```
 
 ### Individual Services
 
