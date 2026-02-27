@@ -23,8 +23,8 @@ async function main() {
     logger.info('Adapter finished, waiting 5 seconds for data processing...');
     await new Promise(resolve => setTimeout(resolve, 5000));
 
-    // Query and display results
-    const result = await queryEvents({ limit: 1000 });
+    // Query and display results - increase limit to see all data
+    const result = await queryEvents({ limit: 200000 });
     const events = result.events;
     
     logger.info(`\n✅ Adapter completed. Total events in database: ${events.length}`);
@@ -36,14 +36,18 @@ async function main() {
     }
     
     logger.info('Events by type:');
-    for (const [type, count] of Object.entries(byType)) {
+    for (const [type, count] of Object.entries(byType).sort()) {
       logger.info(`  ${type}: ${count}`);
     }
     
     // Show sample events
-    logger.info('\nSample events (first 5):');
-    for (const event of events.slice(0, 5)) {
-      logger.info(`  - ${event.type}: ${event.attributes.description || event.attributes.category || event.attributes.message || 'N/A'}`);
+    logger.info('\nSample events (one per type):');
+    const shown = new Set<string>();
+    for (const event of events) {
+      if (!shown.has(event.type)) {
+        shown.add(event.type);
+        logger.info(`  - ${event.type}: ${event.attributes.description || event.attributes.message || event.attributes.category || 'N/A'}`);
+      }
     }
 
     await adapter.stop();

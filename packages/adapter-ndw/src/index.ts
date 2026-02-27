@@ -603,42 +603,69 @@ export class NDWAdapter implements Adapter {
       d2LogicalModel = root['SOAP:Envelope']?.['SOAP:Body']?.d2LogicalModel;
     }
 
-    if (!d2LogicalModel?.travelTimeMeasurement) {
+    if (!d2LogicalModel?.payloadPublication?.siteMeasurements) {
       return events;
     }
 
-    const measurements = Array.isArray(d2LogicalModel.travelTimeMeasurement)
-      ? d2LogicalModel.travelTimeMeasurement
-      : [d2LogicalModel.travelTimeMeasurement];
+    const siteMeasurementsArray = Array.isArray(d2LogicalModel.payloadPublication.siteMeasurements)
+      ? d2LogicalModel.payloadPublication.siteMeasurements
+      : [d2LogicalModel.payloadPublication.siteMeasurements];
 
-    for (const measurement of measurements) {
+    for (const siteMeasurement of siteMeasurementsArray) {
       try {
-        const duration = measurement.travelTime?.[0]?.duration?.['#text'] || 
-                        measurement.duration?.['#text'] || 0;
-        
-        if (!duration) continue;
+        // measuredValue with index attribute contains the actual measuredValue element
+        const measuredValues = Array.isArray(siteMeasurement.measuredValue)
+          ? siteMeasurement.measuredValue
+          : siteMeasurement.measuredValue ? [siteMeasurement.measuredValue] : [];
 
-        const event: TravelTime = {
-          id: crypto.randomUUID(),
-          source: 'ndw',
-          sourceId: measurement['@_id'] || crypto.randomUUID(),
-          type: 'travel_time',
-          geometry: {
-            type: 'Point',
-            coordinates: [5.2913, 52.1326],
-          },
-          timestamp: Date.now(),
-          validFrom: Date.now(),
-          validTo: Date.now() + 300000, // 5 minutes
-          attributes: {
-            duration: parseInt(duration),
-          },
-          createdAt: Date.now(),
-        };
+        for (const measuredValueWrapper of measuredValues) {
+          try {
+            // The structure is: measuredValue[index] -> measuredValue -> basicData
+            const measuredValue = measuredValueWrapper.measuredValue;
+            if (!measuredValue) continue;
 
-        events.push(event);
+            const basicData = measuredValue.basicData;
+            if (!basicData) continue;
+
+            // Try both direct path and via travelTimeData
+            let travelTime = basicData.travelTime;
+            if (!travelTime && basicData.travelTimeData) {
+              travelTime = basicData.travelTimeData.travelTime;
+            }
+
+            if (!travelTime) continue;
+
+            const duration = parseFloat(travelTime.duration);
+            if (isNaN(duration) || duration < 0) continue;
+
+            // Duration is already in minutes, convert to seconds
+            const durationSeconds = Math.round(duration * 60);
+
+            const event: TravelTime = {
+              id: crypto.randomUUID(),
+              source: 'ndw',
+              sourceId: siteMeasurement.measurementSiteReference?.['@_id'] || crypto.randomUUID(),
+              type: 'travel_time',
+              geometry: {
+                type: 'Point',
+                coordinates: [5.2913, 52.1326],
+              },
+              timestamp: Date.now(),
+              validFrom: Date.now(),
+              validTo: Date.now() + 300000, // 5 minutes
+              attributes: {
+                duration: durationSeconds,
+              },
+              createdAt: Date.now(),
+            };
+
+            events.push(event);
+          } catch (err) {
+            logger.debug('parseTravelTime: Error parsing measured value', err);
+          }
+        }
       } catch (err) {
-        logger.debug('parseTravelTime: Error parsing travel time', err);
+        logger.debug('parseTravelTime: Error parsing site measurement', err);
       }
     }
 
@@ -646,12 +673,208 @@ export class NDWAdapter implements Adapter {
     return events;
   }
 
-  private parseRoadWork(_parsed: unknown): RoadWork[] {
-    return [];
+  private parseRoadWork(parsed: unknown): RoadWork[] {
+    const events: RoadWork[] = [];
+    const root = parsed as any;
+
+    // Navigate SOAP structure
+    let d2LogicalModel = root?.d2LogicalModel;
+    if (!d2LogicalModel && root?.['SOAP:Envelope']) {
+      d2LogicalModel = root['SOAP:Envelope']?.['SOAP:Body']?.d2LogicalModel;
+    }
+
+    if (!d2LogicalModel?.payloadPublication) {
+      return events;
+    }
+
+    const situations = Array.isArray(d2LogicalModel.payloadPublication.situation)
+      ? d2LogicalModel.payloadPublication.situation
+      : d2LogicalModel.payloadPublication.situation ? [d2LogicalModel.payloadPublication.situation] : [];
+
+    for (const situation of situations) {
+      try {
+        const situationRecords = Array.isArray(situation.situationRecord)
+          ? situation.situationRecord
+          : situation.situationRecord ? [situation.situationRecord] : [];
+
+        for (const record of situationRecords) {
+          try {
+            // Check if this is maintenance/roadwork type
+            if (record['@_xsi:type'] !== 'MaintenanceWorks' && record['@_xsi:type'] !== 'Roadworks') {
+              continue;
+            }
+
+            // Extract coordinates from groupOfLocations
+            const groupOfLocations = record.groupOfLocations;
+            let coordinates: [number, number] = [5.2913, 52.1326];
+            
+            if (groupOfLocations?.locationForDisplay?.latitude && groupOfLocations?.locationForDisplay?.longitude) {
+              coordinates = [
+                parseFloat(groupOfLocations.locationForDisplay.longitude),
+                parseFloat(groupOfLocations.locationForDisplay.latitude),
+              ];
+            }
+
+            // Extract description
+            let description = 'Road work';
+            const roadworkHindrance = record.roadworkHindrance;
+            if (roadworkHindrance) {
+              const hindranceClass = roadworkHindrance.roadworkHindranceClass;
+              if (hindranceClass) {
+                description = `Road work: ${hindranceClass}`;
+              }
+            }
+
+            // Extract impact severity
+            let impact: 'none' | 'minor' | 'moderate' | 'severe' | undefined = undefined;
+            const overallSeverity = situation.overallSeverity;
+            if (overallSeverity) {
+              if (overallSeverity === 'unknown') impact = 'minor';
+              else if (overallSeverity === 'low') impact = 'minor';
+              else if (overallSeverity === 'medium') impact = 'moderate';
+              else if (overallSeverity === 'high') impact = 'severe';
+            }
+
+            // Extract source name
+            const sourceName = record.source?.sourceName?.values?.value || 'NDW';
+
+            const event: RoadWork = {
+              id: crypto.randomUUID(),
+              source: 'ndw',
+              sourceId: record['@_id'] || crypto.randomUUID(),
+              type: 'road_work',
+              geometry: {
+                type: 'Point',
+                coordinates,
+              },
+              timestamp: Date.now(),
+              validFrom: Date.now(),
+              validTo: Date.now() + 86400000, // 24 hours
+              attributes: {
+                description,
+                impact,
+                source: sourceName,
+              },
+              createdAt: Date.now(),
+            };
+
+            events.push(event);
+          } catch (err) {
+            logger.debug('parseRoadWork: Error parsing record', err);
+          }
+        }
+      } catch (err) {
+        logger.debug('parseRoadWork: Error parsing situation', err);
+      }
+    }
+
+    logger.debug(`parseRoadWork: Parsed ${events.length} road works`);
+    return events;
   }
 
-  private parseDRIPS(_parsed: unknown): MessageSign[] {
-    return [];
+  private parseDRIPS(parsed: unknown): MessageSign[] {
+    const events: MessageSign[] = [];
+    const root = parsed as any;
+
+    // Navigate SOAP structure
+    let d2LogicalModel = root?.d2LogicalModel;
+    if (!d2LogicalModel && root?.['SOAP:Envelope']) {
+      d2LogicalModel = root['SOAP:Envelope']?.['SOAP:Body']?.d2LogicalModel;
+    }
+
+    if (!d2LogicalModel?.payloadPublication?.vmsUnit) {
+      return events;
+    }
+
+    const vmsUnits = Array.isArray(d2LogicalModel.payloadPublication.vmsUnit)
+      ? d2LogicalModel.payloadPublication.vmsUnit
+      : [d2LogicalModel.payloadPublication.vmsUnit];
+
+    for (const vmsUnit of vmsUnits) {
+      try {
+        const vmsWrapper = vmsUnit.vms;
+        if (!vmsWrapper) continue;
+
+        // vms can be an array or single element
+        const vmsArray = Array.isArray(vmsWrapper) ? vmsWrapper : [vmsWrapper];
+
+        for (const vmsOuter of vmsArray) {
+          try {
+            // Navigate to inner vms
+            const vmsInner = vmsOuter.vms;
+            if (!vmsInner) continue;
+
+            const vmsInnerArray = Array.isArray(vmsInner) ? vmsInner : [vmsInner];
+
+            for (const vms of vmsInnerArray) {
+              try {
+                // Check if unit is working
+                const isWorking = vms.vmsWorking;
+                if (isWorking === false || isWorking === 'false') {
+                  continue;
+                }
+
+                // Extract messages
+                const vmsMessages = Array.isArray(vms.vmsMessage)
+                  ? vms.vmsMessage
+                  : vms.vmsMessage ? [vms.vmsMessage] : [];
+
+                for (const vmsMessageWrapper of vmsMessages) {
+                  try {
+                    const vmsMessage = vmsMessageWrapper.vmsMessage;
+                    if (!vmsMessage) continue;
+
+                    // Try to extract message text from vmsMessageExtension
+                    let messageText = 'VMS Message';
+                    
+                    if (vmsMessage.vmsMessageExtension) {
+                      const msgExt = vmsMessage.vmsMessageExtension;
+                      
+                      // msgExt could be the extension itself or contain it
+                      const extension = msgExt.vmsMessageExtension || msgExt;
+                      if (extension?.textLine) {
+                        messageText = extension.textLine;
+                      }
+                    }
+
+                    const event: MessageSign = {
+                      id: crypto.randomUUID(),
+                      source: 'ndw',
+                      sourceId: vmsUnit.vmsUnitReference?.['@_id'] || crypto.randomUUID(),
+                      type: 'message_sign',
+                      geometry: {
+                        type: 'Point',
+                        coordinates: [5.2913, 52.1326],
+                      },
+                      timestamp: Date.now(),
+                      validFrom: Date.now(),
+                      validTo: Date.now() + 3600000, // 1 hour
+                      attributes: {
+                        message: messageText,
+                      },
+                      createdAt: Date.now(),
+                    };
+
+                    events.push(event);
+                  } catch (err) {
+                    logger.debug('parseDRIPS: Error parsing vmsMessage', err);
+                  }
+                }
+              } catch (err) {
+                logger.debug('parseDRIPS: Error parsing inner vms', err);
+              }
+            }
+          } catch (err) {
+            logger.debug('parseDRIPS: Error parsing outer vms', err);
+          }
+        }
+      } catch (err) {
+        logger.debug('parseDRIPS: Error parsing vmsUnit', err);
+      }
+    }
+
+    logger.debug(`parseDRIPS: Parsed ${events.length} messages/signs`);
+    return events;
   }
 
   private async gunzip(buffer: ArrayBuffer): Promise<ArrayBuffer> {
