@@ -164,18 +164,18 @@ function updateMapLayers(events: AnyEvent[]) {
 /**
  * Build filter object based on checked layers
  */
-function getEnabledTypesFilter(): string | undefined {
+function getEnabledTypesFilter(): string[] | undefined {
   const enabledTypes = Object.entries(state.layerVisibility)
     .filter(([_, visible]) => visible)
     .map(([type, _]) => type);
 
-  if (enabledTypes.length === 0) {
+  if (enabledTypes.length === 0 || enabledTypes.length === 5) {
+    // Return undefined to get all types (when none or all are selected)
     return undefined;
   }
 
-  // For now, return the first enabled type if only one, or undefined to get all
-  // In a real app, you might want to support multiple types
-  return enabledTypes.length === 5 ? undefined : enabledTypes[0];
+  // Return array of enabled types
+  return enabledTypes;
 }
 
 /**

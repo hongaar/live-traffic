@@ -189,22 +189,29 @@ export class NDWAdapter implements Adapter {
   }
 
   private async fetchTrafficSpeed(): Promise<void> {
+    const feedName = 'trafficspeed';
     const url = FEEDS.trafficspeed;
 
     try {
-      const startTime = Date.now();
-      logger.logRequest('GET', url);
+      let xmlStr: string | null = readFromCache(feedName);
 
-      const response = await fetch(url);
-      const buffer = await response.arrayBuffer();
-      const decompressed = await this.gunzip(buffer);
-      const xmlStr = new TextDecoder().decode(decompressed);
+      if (!xmlStr) {
+        const startTime = Date.now();
+        logger.logRequest('GET', url);
 
-      const duration = Date.now() - startTime;
-      logger.logResponse('GET', url, response.status, duration, {
-        decompressedSize: decompressed.byteLength,
-        xmlSize: xmlStr.length,
-      });
+        const response = await fetch(url);
+        const buffer = await response.arrayBuffer();
+        const decompressed = await this.gunzip(buffer);
+        xmlStr = new TextDecoder().decode(decompressed);
+
+        const duration = Date.now() - startTime;
+        logger.logResponse('GET', url, response.status, duration, {
+          decompressedSize: decompressed.byteLength,
+          xmlSize: xmlStr.length,
+        });
+
+        writeToCache(feedName, xmlStr);
+      }
 
       const parsed = xmlParser.parse(xmlStr);
       const events = this.parseTrafficSpeed(parsed);
@@ -237,22 +244,29 @@ export class NDWAdapter implements Adapter {
   }
 
   private async fetchTravelTime(): Promise<void> {
+    const feedName = 'traveltime';
     const url = FEEDS.traveltime;
 
     try {
-      const startTime = Date.now();
-      logger.logRequest('GET', url);
+      let xmlStr: string | null = readFromCache(feedName);
 
-      const response = await fetch(url);
-      const buffer = await response.arrayBuffer();
-      const decompressed = await this.gunzip(buffer);
-      const xmlStr = new TextDecoder().decode(decompressed);
+      if (!xmlStr) {
+        const startTime = Date.now();
+        logger.logRequest('GET', url);
 
-      const duration = Date.now() - startTime;
-      logger.logResponse('GET', url, response.status, duration, {
-        decompressedSize: decompressed.byteLength,
-        xmlSize: xmlStr.length,
-      });
+        const response = await fetch(url);
+        const buffer = await response.arrayBuffer();
+        const decompressed = await this.gunzip(buffer);
+        xmlStr = new TextDecoder().decode(decompressed);
+
+        const duration = Date.now() - startTime;
+        logger.logResponse('GET', url, response.status, duration, {
+          decompressedSize: decompressed.byteLength,
+          xmlSize: xmlStr.length,
+        });
+
+        writeToCache(feedName, xmlStr);
+      }
 
       const parsed = xmlParser.parse(xmlStr);
       const events = this.parseTravelTime(parsed);
@@ -285,22 +299,29 @@ export class NDWAdapter implements Adapter {
   }
 
   private async fetchRoadWork(): Promise<void> {
+    const feedName = 'roadwork';
     const url = FEEDS.roadwork;
 
     try {
-      const startTime = Date.now();
-      logger.logRequest('GET', url);
+      let xmlStr: string | null = readFromCache(feedName);
 
-      const response = await fetch(url);
-      const buffer = await response.arrayBuffer();
-      const decompressed = await this.gunzip(buffer);
-      const xmlStr = new TextDecoder().decode(decompressed);
+      if (!xmlStr) {
+        const startTime = Date.now();
+        logger.logRequest('GET', url);
 
-      const duration = Date.now() - startTime;
-      logger.logResponse('GET', url, response.status, duration, {
-        decompressedSize: decompressed.byteLength,
-        xmlSize: xmlStr.length,
-      });
+        const response = await fetch(url);
+        const buffer = await response.arrayBuffer();
+        const decompressed = await this.gunzip(buffer);
+        xmlStr = new TextDecoder().decode(decompressed);
+
+        const duration = Date.now() - startTime;
+        logger.logResponse('GET', url, response.status, duration, {
+          decompressedSize: decompressed.byteLength,
+          xmlSize: xmlStr.length,
+        });
+
+        writeToCache(feedName, xmlStr);
+      }
 
       const parsed = xmlParser.parse(xmlStr);
       const events = this.parseRoadWork(parsed);
@@ -333,22 +354,29 @@ export class NDWAdapter implements Adapter {
   }
 
   private async fetchDRIPS(): Promise<void> {
+    const feedName = 'drips';
     const url = FEEDS.drips;
 
     try {
-      const startTime = Date.now();
-      logger.logRequest('GET', url);
+      let xmlStr: string | null = readFromCache(feedName);
 
-      const response = await fetch(url);
-      const buffer = await response.arrayBuffer();
-      const decompressed = await this.gunzip(buffer);
-      const xmlStr = new TextDecoder().decode(decompressed);
+      if (!xmlStr) {
+        const startTime = Date.now();
+        logger.logRequest('GET', url);
 
-      const duration = Date.now() - startTime;
-      logger.logResponse('GET', url, response.status, duration, {
-        decompressedSize: decompressed.byteLength,
-        xmlSize: xmlStr.length,
-      });
+        const response = await fetch(url);
+        const buffer = await response.arrayBuffer();
+        const decompressed = await this.gunzip(buffer);
+        xmlStr = new TextDecoder().decode(decompressed);
+
+        const duration = Date.now() - startTime;
+        logger.logResponse('GET', url, response.status, duration, {
+          decompressedSize: decompressed.byteLength,
+          xmlSize: xmlStr.length,
+        });
+
+        writeToCache(feedName, xmlStr);
+      }
 
       const parsed = xmlParser.parse(xmlStr);
       const events = this.parseDRIPS(parsed);
@@ -402,41 +430,63 @@ export class NDWAdapter implements Adapter {
     const logicalModel = d2LogicalModel;
     logger.verbose('parseIncidents: LogicalModel keys', Object.keys(logicalModel).slice(0, 10));
 
-    if (!logicalModel.situationRecord) {
-      logger.debug('parseIncidents: No situationRecord found in d2LogicalModel');
+    // Navigate to payloadPublication -> situation -> situationRecord
+    const payloadPublication = logicalModel.payloadPublication;
+    if (!payloadPublication) {
+      logger.debug('parseIncidents: No payloadPublication found in d2LogicalModel');
       return events;
     }
 
-    const records = Array.isArray(logicalModel.situationRecord)
-      ? logicalModel.situationRecord
-      : [logicalModel.situationRecord];
+    const situations = Array.isArray(payloadPublication.situation)
+      ? payloadPublication.situation
+      : payloadPublication.situation ? [payloadPublication.situation] : [];
+
+    logger.debug(`parseIncidents: Found ${situations.length} situations`);
+
+    const records: any[] = [];
+    for (const situation of situations) {
+      const situationRecords = Array.isArray(situation.situationRecord)
+        ? situation.situationRecord
+        : situation.situationRecord ? [situation.situationRecord] : [];
+      records.push(...situationRecords);
+    }
 
     logger.debug(`parseIncidents: Found ${records.length} situation records`);
 
     for (const record of records) {
       try {
-        const situation = record.situation;
-        if (!situation) {
-          logger.verbose('parseIncidents: Record has no situation');
-          continue;
-        }
-
-        const eventData = situation.eventData || situation;
-        const loc = eventData.eventLocation || eventData.location || {};
-
-        // Extract coordinates
+        // Extract coordinates from groupOfLocations
+        const groupOfLocations = record.groupOfLocations;
         let coordinates: [number, number] = [5.2913, 52.1326]; // Default to Netherlands center
-        if (loc.Point?.Location?.Latitude && loc.Point?.Location?.Longitude) {
+        
+        if (groupOfLocations?.locationForDisplay?.latitude && groupOfLocations?.locationForDisplay?.longitude) {
           coordinates = [
-            parseFloat(loc.Point.Location.Longitude['#text'] || loc.Point.Location.Longitude),
-            parseFloat(loc.Point.Location.Latitude['#text'] || loc.Point.Location.Latitude),
+            parseFloat(groupOfLocations.locationForDisplay.longitude),
+            parseFloat(groupOfLocations.locationForDisplay.latitude),
           ];
+        } else if (groupOfLocations?.linearByCoordinatesExtension?.linearCoordinatesStartPoint?.pointCoordinates) {
+          const point = groupOfLocations.linearByCoordinatesExtension.linearCoordinatesStartPoint.pointCoordinates;
+          if (point.latitude && point.longitude) {
+            coordinates = [
+              parseFloat(point.longitude),
+              parseFloat(point.latitude),
+            ];
+          }
         }
+
+        // Extract description
+        let description = 'Traffic incident';
+        if (record.vehicleObstructionType) {
+          description = `Vehicle obstruction: ${record.vehicleObstructionType}`;
+        }
+
+        // Extract source name
+        const sourceName = record.source?.sourceName?.values?.value || 'NDW';
 
         const incident: TrafficIncident = {
           id: crypto.randomUUID(),
           source: 'ndw',
-          sourceId: record['@_id'] || crypto.randomUUID(),
+          sourceId: record['@_id'] || record.situationRecordCreationReference || crypto.randomUUID(),
           type: 'incident',
           geometry: {
             type: 'Point',
@@ -446,9 +496,10 @@ export class NDWAdapter implements Adapter {
           validFrom: Date.now(),
           validTo: Date.now() + 86400000, // 24 hours
           attributes: {
-            description: eventData.eventDescription?.[0]?.['#text'] || eventData.description || 'Traffic incident',
-            severity: this.extractSeverity(eventData),
-            category: eventData.eventType || 'incident',
+            description,
+            severity: undefined,
+            category: record['@_xsi:type'] || 'incident',
+            source: sourceName,
           },
           createdAt: Date.now(),
         };
@@ -482,49 +533,59 @@ export class NDWAdapter implements Adapter {
       d2LogicalModel = root['SOAP:Envelope']?.['SOAP:Body']?.d2LogicalModel;
     }
 
-    if (!d2LogicalModel?.measurementSiteMeasurements) {
+    if (!d2LogicalModel?.payloadPublication?.siteMeasurements) {
       return events;
     }
 
-    const measurements = Array.isArray(d2LogicalModel.measurementSiteMeasurements)
-      ? d2LogicalModel.measurementSiteMeasurements
-      : [d2LogicalModel.measurementSiteMeasurements];
+    const siteMeasurementsArray = Array.isArray(d2LogicalModel.payloadPublication.siteMeasurements)
+      ? d2LogicalModel.payloadPublication.siteMeasurements
+      : [d2LogicalModel.payloadPublication.siteMeasurements];
 
-    for (const measurement of measurements) {
+    for (const siteMeasurement of siteMeasurementsArray) {
       try {
-        const siteMeasurements = measurement.siteMeasurementsForAPoint || [measurement];
-        const speedArray = Array.isArray(siteMeasurements) ? siteMeasurements : [siteMeasurements];
+        const measuredValues = Array.isArray(siteMeasurement.measuredValue)
+          ? siteMeasurement.measuredValue
+          : siteMeasurement.measuredValue ? [siteMeasurement.measuredValue] : [];
 
-        for (const speed of speedArray) {
-          const speedValue = speed.measuredValue?.[0]?.speed?.['#text'] || 
-                            speed.speed?.['#text'] || 
-                            speed.measuredValue?.speed || 0;
-          
-          if (!speedValue) continue;
+        for (const measuredValue of measuredValues) {
+          try {
+            // Check if this has speed data
+            const basicData = measuredValue.measuredValue?.basicData;
+            if (!basicData) continue;
 
-          const event: SpeedMeasurement = {
-            id: crypto.randomUUID(),
-            source: 'ndw',
-            sourceId: measurement['@_id'] || crypto.randomUUID(),
-            type: 'speed',
-            geometry: {
-              type: 'Point',
-              coordinates: [5.2913, 52.1326],
-            },
-            timestamp: Date.now(),
-            validFrom: Date.now(),
-            validTo: Date.now() + 300000, // 5 minutes
-            attributes: {
-              speed: parseInt(speedValue),
-              averageSpeed: parseInt(speedValue),
-            },
-            createdAt: Date.now(),
-          };
+            const speedData = basicData.averageVehicleSpeed;
+            if (!speedData) continue;
 
-          events.push(event);
+            const speedValue = parseInt(speedData.speed);
+            // Skip invalid speeds (e.g., -1)
+            if (speedValue < 0) continue;
+
+            const event: SpeedMeasurement = {
+              id: crypto.randomUUID(),
+              source: 'ndw',
+              sourceId: siteMeasurement.measurementSiteReference?.['@_id'] || crypto.randomUUID(),
+              type: 'speed',
+              geometry: {
+                type: 'Point',
+                coordinates: [5.2913, 52.1326],
+              },
+              timestamp: Date.now(),
+              validFrom: Date.now(),
+              validTo: Date.now() + 300000, // 5 minutes
+              attributes: {
+                speed: speedValue,
+                averageSpeed: speedValue,
+              },
+              createdAt: Date.now(),
+            };
+
+            events.push(event);
+          } catch (err) {
+            logger.debug('parseTrafficSpeed: Error parsing measured value', err);
+          }
         }
       } catch (err) {
-        logger.debug('parseTrafficSpeed: Error parsing speed measurement', err);
+        logger.debug('parseTrafficSpeed: Error parsing site measurement', err);
       }
     }
 

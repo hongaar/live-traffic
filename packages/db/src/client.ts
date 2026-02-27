@@ -130,8 +130,18 @@ export async function queryEvents(params: EventQueryParams) {
   let paramIndex = 1; // For PostgreSQL
 
   if (params.type) {
-    query += dbKind === 'postgres' ? ` AND type = $${paramIndex++}` : ' AND type = ?';
-    values.push(params.type);
+    const types = Array.isArray(params.type) ? params.type : [params.type];
+    
+    if (types.length > 0) {
+      if (dbKind === 'postgres') {
+        const placeholders = types.map(() => `$${paramIndex++}`).join(',');
+        query += ` AND type IN (${placeholders})`;
+      } else {
+        const placeholders = types.map(() => '?').join(',');
+        query += ` AND type IN (${placeholders})`;
+      }
+      values.push(...types);
+    }
   }
 
   if (params.since) {

@@ -110,7 +110,7 @@ export type AnyEvent = z.infer<typeof AnyEventSchema>;
 // API query types
 
 export const EventQueryParamsSchema = z.object({
-  type: z.string().optional(), // filter by event type
+  type: z.union([z.string(), z.array(z.string())]).optional(), // filter by event type(s) - can be single string or array
   bbox: z
     .string()
     .optional()
