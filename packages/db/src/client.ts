@@ -220,7 +220,7 @@ export async function upsertSource(source: Omit<SourceInsert, 'config'> & { conf
   const existing = await getSource(source.adapterId);
 
   if (existing) {
-    const configValue = config ? JSON.stringify(config) : existing.config;
+    const configValue = config ? JSON.stringify(config) : (existing.config ? JSON.stringify(existing.config) : null);
 
     if (dbKind === 'postgres') {
       await db.run(

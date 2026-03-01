@@ -225,7 +225,7 @@ async function updateFilters() {
   try {
     const filters: EventQueryParams = {
       type: getEnabledTypesFilter(),
-      limit: 200,
+      limit: 10000,
       since: Date.now() - 3600000, // Last hour
     };
 

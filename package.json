@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev --parallel",
+    "dev": "DB_PATH=./live-traffic.db NDW_USE_CACHE=true LOG_LEVEL=verbose turbo run dev --parallel",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
