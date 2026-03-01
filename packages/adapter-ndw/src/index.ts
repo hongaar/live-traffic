@@ -497,7 +497,7 @@ export class NDWAdapter implements Adapter {
           validTo: Date.now() + 86400000, // 24 hours
           attributes: {
             description,
-            severity: undefined,
+            severity: this.extractSeverity(record),
             category: record['@_xsi:type'] || 'incident',
             source: sourceName,
           },
