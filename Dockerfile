@@ -2,13 +2,11 @@ FROM oven/bun:1.3.8 as builder
 
 WORKDIR /app
 
-# Install dependencies
-# Use bun.lock (text-based) for better git compatibility and reproducibility
-COPY package.json bun.lock ./
-RUN bun install --no-save
-
-# Copy source
+# Copy everything first so workspace packages are available during install
 COPY . .
+
+# Install dependencies with complete monorepo structure
+RUN bun install --frozen-lockfile
 
 # Build
 RUN bun run build
