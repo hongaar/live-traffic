@@ -188,8 +188,18 @@ The database client automatically detects the driver via `DB_KIND` environment v
 
 ### 3. Environment Variables
 
-Copy `.env.example` to `.env`:
+Bun automatically loads environment variables from `.env.local` and `.env` files.
 
+**Setup:**
+
+```bash
+# Copy the example file
+cp .env.example .env.local
+
+# Edit .env.local with your settings (see below for examples)
+```
+
+**.env.local** (in `.gitignore` - not committed):
 ```bash
 # Database - Choose ONE of these configurations:
 
@@ -208,6 +218,29 @@ CORS_ORIGIN=http://localhost:5173
 # Web App
 VITE_API_BASE=http://localhost:3000
 VITE_WS_URL=ws://localhost:3000/ws
+
+# NDW Adapter
+NDW_USE_CACHE=true
+LOG_LEVEL=verbose
+```
+
+**Reference: `.env.example`** (in git - provides defaults):
+```bash
+# Database Configuration
+DB_PATH=./live-traffic.db
+DB_KIND=sqlite
+
+# NDW Adapter Configuration
+NDW_USE_CACHE=true
+
+# Logging
+LOG_LEVEL=verbose
+
+# API Server
+PORT=3000
+
+# Web App
+VITE_WS_URL=ws://localhost:3000/ws
 ```
 
 **Database Selection:**
@@ -223,13 +256,14 @@ VITE_WS_URL=ws://localhost:3000/ws
 ### All Services (Development)
 
 ```bash
-# Start all services with shared database ✅
-DB_PATH=./live-traffic.db bun run dev
+# Start all services (loads env vars from .env.local)
+bun run dev
 ```
 
-Starts collector, API, and web app in parallel using Turborepo with a **shared file-based SQLite database**.
+Starts collector, API, and web app in parallel using Turborepo with a **shared file-based SQLite database** (configured in `.env.local`).
 
 **Key points:**
+- Environment variables loaded from `.env.local` (Bun's built-in support)
 - Both collector and API use the same database file
 - Collector writes events; API serves them
 - WAL mode enables safe concurrent access
