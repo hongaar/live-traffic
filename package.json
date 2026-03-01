@@ -13,6 +13,7 @@
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
+    "start": "node scripts/start.js",
     "db:migrate": "turbo run db:migrate --filter=@live-traffic/db",
     "db:generate": "turbo run db:generate --filter=@live-traffic/db"
   },

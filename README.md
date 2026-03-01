@@ -905,6 +905,26 @@ bun run build
 - [ ] **Monitoring**: Prometheus metrics, logging
 - [ ] **Testing**: Unit, integration, e2e tests
 
+## Deployment
+
+Ready for production deployment on **Railway** with free tier support.
+
+**Quick Deploy:**
+1. Push code to GitHub
+2. Create Railway project connected to your repo
+3. Add PostgreSQL service
+4. Set environment variables (see [DEPLOYMENT.md](./DEPLOYMENT.md))
+5. Automatic deployment on push to `main`
+
+**Features:**
+- ✅ Automatic deployments via GitHub
+- ✅ PostgreSQL database included
+- ✅ Free tier suitable for moderate traffic
+- ✅ Custom domain HTTPS support
+- ✅ Monitoring and logs
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed setup instructions.
+
 ## Contributing
 
 1. Create a feature branch
