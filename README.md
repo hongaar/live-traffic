@@ -924,18 +924,21 @@ Ready for production deployment on **Railway** with free tier support.
 ```
 Your GitHub Repo
     ↓
-[GitHub Actions CI]
+[GitHub Actions CI] (.github/workflows/test.yml)
   - Type check
   - Lint
   - Build
-    ↓ (on main branch only)
-[Railway Auto-Deploy]
+    ↓ (checks pass)
+[Railway Auto-Deploy] (automatic on push to main)
+  - Detects new commit
   - Build Docker image
   - Run migrations
   - Deploy API service
   - Deploy Collector service
   - Start PostgreSQL
 ```
+
+**Note:** Railway automatically deploys when it detects a new commit to your connected GitHub repo. No additional deploy workflow needed!
 
 ### Quick Start
 
