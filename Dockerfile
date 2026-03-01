@@ -4,8 +4,8 @@ WORKDIR /app
 
 # Install dependencies
 # Use bun.lock (text-based) for better git compatibility and reproducibility
-COPY package.json bun.lock* ./
-RUN bun install
+COPY package.json bun.lock ./
+RUN bun install --no-save
 
 # Copy source
 COPY . .
